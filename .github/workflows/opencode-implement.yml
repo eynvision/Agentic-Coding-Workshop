@@ -1,0 +1,76 @@
+name: opencode-implement
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.OPENCODE_PAT }}
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Configure git identity
+        run: |
+          git config --global user.name "opencode-agent"
+          git config --global user.email "opencode-agent@users.noreply.github.com"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run OpenCode
+        uses: anomalyco/opencode/github@latest
+        timeout-minutes: 25
+        env:
+          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.OPENCODE_PAT }}
+        with:
+          use_github_token: true
+          model: minimax/MiniMax-M2.7
+          prompt: |
+            Implement the feature described in this GitHub issue.
+
+            IMPORTANT: Read AGENTS.md first — it contains project conventions and instructions.
+
+            Follow these steps:
+            1. Read docs/ARCHITECTURE.md, docs/BACKEND.md, docs/FRONTEND.md, and docs/DEVELOPMENT.md to understand the codebase
+            2. Implement the required changes based on the issue description
+            3. When adding a new DB field, update all 3 places: database.py CREATE TABLE + MIGRATIONS, models.py, routes.py
+            4. Run validation commands and iterate until ALL pass:
+               - cd backend && ruff check . && python -m compileall . -q && pytest -q
+               - cd frontend && npm run build
+            5. If tests fail, read the error, fix the code, and re-run until all pass
+            6. Commit your changes with a descriptive message
+            7. Create a pull request with a summary of what was implemented
+
+            Do NOT skip running tests. Iterate until all checks pass.

@@ -1,0 +1,53 @@
+name: opencode-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Run OpenCode Review
+        uses: anomalyco/opencode/github@latest
+        timeout-minutes: 12
+        env:
+          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          use_github_token: true
+          model: minimax/MiniMax-M2.7
+          prompt: |
+            You are a code reviewer. Do a LIGHT review of this pull request.
+
+            Focus ONLY on:
+            1. Obvious bugs or errors that would cause test failures or runtime crashes
+            2. Missing tests for the changed functionality
+            3. Code that contradicts established patterns in the codebase
+
+            Do NOT comment on:
+            - Code style preferences or nitpicks
+            - Suggested refactors or architectural changes
+            - Minor naming conventions
+            - Hypothetical edge cases that are unlikely to occur
+            - Documentation improvements unless critical info is missing
+
+            Keep your review brief — max 3-5 comments. Be practical, not theoretical.
+            If the code looks good and works correctly, say so with a brief approval.
